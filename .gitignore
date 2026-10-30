@@ -1,0 +1,18 @@
+# Downloaded games and generated datasets
+chess_data/
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Trained models and checkpoints
+models/
+checkpoints/
+
+# Local credentials
+.env
+
+# Interrupted downloads
+*.part
