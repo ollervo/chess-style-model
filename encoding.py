@@ -48,6 +48,53 @@ def encode_position(fen):
 
     return planes
 
+def encode_move(move):
+    """Convert a chess.Move into a vector of 133 numbers."""
+
+    encoded = np.zeros(133, dtype=np.float32)
+
+    # Entries 0–63: origin square.
+    encoded[move.from_square] = 1.0
+
+    # Entries 64–127: destination square.
+    encoded[64 + move.to_square] = 1.0
+
+    # Entries 128–132: promotion choice.
+    promotion_options = [
+        None,
+        chess.KNIGHT,
+        chess.BISHOP,
+        chess.ROOK,
+        chess.QUEEN,
+    ]
+
+    promotion_index = promotion_options.index(move.promotion)
+    encoded[128 + promotion_index] = 1.0
+
+    return encoded
+
+def encode_candidates(fen):
+    """Build one input row for every legal move in a position."""
+
+    board = chess.Board(fen)
+
+    position_vector = encode_position(fen).reshape(-1)
+    legal_moves = list(board.legal_moves)
+
+    # 1216 position features + 133 move features.
+    inputs = np.empty(
+        (len(legal_moves), 1349),
+        dtype=np.float32,
+    )
+
+    for index, move in enumerate(legal_moves):
+        inputs[index] = np.concatenate([
+            position_vector,
+            encode_move(move),
+        ])
+
+    return legal_moves, inputs
+
 if __name__ == "__main__":
     import json
     from pathlib import Path
@@ -68,3 +115,25 @@ if __name__ == "__main__":
     print(chess.Board(example["fen"]))
 
     print("\nArray shape:", encoded.shape)
+
+    legal_moves, inputs = encode_candidates(example["fen"])
+
+    played_move = chess.Move.from_uci(example["move_uci"])
+    target_index = legal_moves.index(played_move)
+
+    print("\nCandidate input shape:", inputs.shape)
+    print("Move you played:", played_move.uci())
+    print("Its row index:", target_index)
+
+    print("\nFirst five candidate moves:")
+    for index, move in enumerate(legal_moves[:5]):
+        print(index, move.uci())
+
+    move_vector = encode_move(played_move)
+
+    print("\nMove vector shape:", move_vector.shape)
+    print("Active entries:", np.flatnonzero(move_vector))
+
+    assert move_vector.shape == (133,)
+    assert move_vector.sum() == 3
+    assert inputs.shape == (len(legal_moves), 1349)
