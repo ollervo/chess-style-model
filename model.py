@@ -58,6 +58,70 @@ class MoveModel:
 
         return probabilities, cache
 
+    def loss_and_gradients(self, inputs, target_index):
+        """Calculate cross-entropy loss and its parameter gradients."""
+
+        probabilities, cache = self.forward(inputs)
+
+        if not 0 <= target_index < len(probabilities):
+            raise ValueError("Target index is outside the candidate list.")
+
+        # Compute -log(probability of the target) directly from scores.
+        # This remains stable even if that probability underflows to zero.
+        shifted = cache["shifted_scores"]
+
+        loss = (
+            np.log(np.sum(np.exp(shifted)))
+            - shifted[target_index]
+        )
+
+        # Softmax + cross-entropy derivative: predicted minus actual.
+        d_scores = probabilities.copy()
+        d_scores[target_index] -= 1.0
+
+        # Restore the output layer's (number_of_moves, 1) shape.
+        d_scores = d_scores[:, None]
+
+        hidden = cache["hidden"]
+
+        # Output layer gradients.
+        d_W2 = hidden.T @ d_scores
+        d_b2 = np.sum(d_scores, axis=0)
+
+        # Pass the gradient back into the hidden layer.
+        d_hidden = d_scores @ self.W2.T
+
+        # ReLU derivative is 1 for positive inputs, otherwise 0.
+        d_z1 = d_hidden * (cache["z1"] > 0)
+
+        # First layer gradients.
+        d_W1 = inputs.T @ d_z1
+        d_b1 = np.sum(d_z1, axis=0)
+
+        gradients = {
+            "W1": d_W1,
+            "b1": d_b1,
+            "W2": d_W2,
+            "b2": d_b2,
+        }
+
+        return float(loss), gradients
+
+    def train_step(self, inputs, target_index, learning_rate=0.01):
+        """Take one gradient descent step on one position."""
+
+        loss, gradients = self.loss_and_gradients(
+            inputs,
+            target_index,
+        )
+
+        self.W1 -= learning_rate * gradients["W1"]
+        self.b1 -= learning_rate * gradients["b1"]
+        self.W2 -= learning_rate * gradients["W2"]
+        self.b2 -= learning_rate * gradients["b2"]
+
+        return loss
+
 
 if __name__ == "__main__":
     import json
