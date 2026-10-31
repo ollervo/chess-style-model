@@ -13,9 +13,9 @@ ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "chess_data" / "ollervo"
 MODEL_DIR = ROOT / "models"
 
-TRAIN_SIZE = 1000
-VALIDATION_SIZE = 200
-EPOCHS = 50
+TRAIN_SIZE = 10_000
+VALIDATION_SIZE = 2_000
+EPOCHS = 20
 LEARNING_RATE = 0.001
 
 
