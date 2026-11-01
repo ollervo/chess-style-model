@@ -95,6 +95,65 @@ def encode_candidates(fen):
 
     return legal_moves, inputs
 
+def encode_engine_candidates(fen, evaluations):
+    """Append four engine features to each legal candidate's input."""
+
+    moves, basic_inputs = encode_candidates(fen)
+
+    expected_moves = {move.uci() for move in moves}
+
+    if set(evaluations) != expected_moves:
+        raise ValueError(
+            "Engine evaluations must match the position's legal moves."
+        )
+
+    if not moves:
+        raise ValueError("This position has no legal moves.")
+
+    engine_features = np.zeros(
+        (len(moves), 4),
+        dtype=np.float32,
+    )
+
+    for index, move in enumerate(moves):
+        evaluation = evaluations[move.uci()]
+
+        cp = evaluation["cp"]
+        mate = evaluation["mate"]
+
+        if mate is not None:
+            # Mate distance zero means the evaluated side is mated.
+            winning_mate = mate > 0
+
+            engine_features[index, 0] = (
+                1.0 if winning_mate else -1.0
+            )
+
+            engine_features[index, 2] = float(winning_mate)
+            engine_features[index, 3] = float(not winning_mate)
+
+        elif cp is not None:
+            engine_features[index, 0] = np.tanh(cp / 400.0)
+
+        else:
+            raise ValueError(
+                f"Missing evaluation for move {move.uci()}."
+            )
+
+    # Gap in bounded evaluation, scaled into [0, 1].
+    best_quality = np.max(engine_features[:, 0])
+
+    engine_features[:, 1] = (
+        best_quality - engine_features[:, 0]
+    ) / 2.0
+
+    inputs = np.concatenate(
+        [basic_inputs, engine_features],
+        axis=1,
+    )
+
+    return moves, inputs
+
 if __name__ == "__main__":
     import json
     from pathlib import Path
